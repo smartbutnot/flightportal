@@ -13,15 +13,15 @@
 312,A310,Airbus A310-200,H
 313,A310,Airbus A310-300,H
 318,A318,Airbus A318,M
-319,A319,Airbus A319
+319,A319,Airbus A319,M
 31F,A310,Airbus A310 Freighter,M
 31N,A19N,Airbus A319 Neo,M
 31X,A310,Airbus A310-200 Freighter,M
 31Y,A310,Airbus A310-300 Freighter,M
 320,A320,Airbus A320-100/200,M
 321,A321,Airbus A321-100/200,M
-32A,A320,Airbus A320-200
-32C,A318,Airbus A318
+32A,A320,Airbus A320-200,M
+32C,A318,Airbus A318,M
 32D,A319,Airbus A319,M
 32N,A20N,Airbus A320-200 Neo,M
 32Q,A21N,Airbus A321-200 Neo,M
@@ -190,9 +190,8 @@ BET,n/a,Beechcraft light aircraft - twin turboprop engine,L
 BH2,n/a,Bell Helicopters,n/a
 BNI,BN2P,Pilatus Britten-Norman BN-2A/B Islander,L
 BNT,TRIS,Pilatus Britten-Norman BN-2A Mk III Trislander,L
-BUS,n/a,Bus,n/a
 C27,AJ27,COMAC ARJ21,M
-,C919,COMAC C919,M
+x,C919,COMAC C919,M
 CCJ,CL60,Canadair Challenger,M
 CCX,GLEX,Canadair Global Express,M
 CD2,NOMA,Government Aircraft Factories N22B / N24A Nomad,L
