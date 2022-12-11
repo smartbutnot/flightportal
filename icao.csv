@@ -280,8 +280,8 @@ E70,E170,Embraer 170,M
 E90,E190,Embraer 190,M
 EC3,EC30,Eurocopter EC.130,n/a
 E70,E170,Embraer 170,M
-E75,E75S,Embraer 175 (Short wing)	M
-E75,E75L,Embraer 175 (Long Wing)	M
+E75,E75S,Embraer 175 (Short wing),M
+E75,E75L,Embraer 175 (Long Wing),M
 E90,E190,Embraer 190,M
 E95,E195,Embraer 195,M
 EM2,E120,Embraer EMB.120 Brasilia,L
