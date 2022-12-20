@@ -18,7 +18,21 @@ To make one you will need:
 
 Prep the portal as detailed here (https://learn.adafruit.com/adafruit-matrixportal-m4/prep-the-matrixportal), put the code, secrets and icao files on, put your wifi details and the geo box you want to search in the secrets file, and you should be good to go!
 
-I soldered a connection straight onto the panel's power port as below, because there's plenty of power for this amount of pixels coming straight through the USB c connection on the MatrixPortal. YOu should also be able to use the power lead that will come with the panel to do this.
+The libaries it needs are I think all part of the recommended prep above, but for info they are:
+
+-adafruit_fakerequests
+-adafruit_requests
+-adafruit_io
+-adafruit_matrixportal
+-adafruit_minimqtt
+-adafruit_display_text
+-adafruit_portalbase
+
+For power, the easiest thing is to use the cable that came with your matrix panel, as long as it has two prongs that go to the screws on the matrixportal. All that's needed is for the portal to connect to the power port on the panel - we're not using much power here (I clock it at about 2w). Any decent usb power supply connected to the portal should do it.
+
+I soldered a connection straight onto the panel's power port as below, for neatness, but that'c completely optional. 
+
+For debugging, use putty or similar, see what COM port the portal is on (device manager in windows will show you), and run a serial connection to that port at 115200. It should print out helpful messages about errors, flights it sees, etc. You can also paste the URLs you see in the code into a browser and check you can find flights, etc.
 
 ![IMG_2125](https://user-images.githubusercontent.com/103124527/206903066-7af5c076-101e-4598-b3ba-0f64766e4162.jpg)
 ![IMG_2126_small](https://user-images.githubusercontent.com/103124527/206903084-42378ce0-b8d8-4810-a18a-f35b9a509752.jpg)
