@@ -20,13 +20,13 @@ Prep the portal as detailed here (https://learn.adafruit.com/adafruit-matrixport
 
 The libaries it needs are I think all part of the recommended prep above, but for info they are:
 
--adafruit_fakerequests
--adafruit_requests
--adafruit_io
--adafruit_matrixportal
--adafruit_minimqtt
--adafruit_display_text
--adafruit_portalbase
+- adafruit_fakerequests
+- adafruit_requests
+- adafruit_io
+- adafruit_matrixportal
+- adafruit_minimqtt
+- adafruit_display_text
+- adafruit_portalbase
 
 For power, the easiest thing is to use the cable that came with your matrix panel, as long as it has two prongs that go to the screws on the matrixportal. All that's needed is for the portal to connect to the power port on the panel - we're not using much power here (I clock it at about 2w). Any decent usb power supply connected to the portal should do it.
 
