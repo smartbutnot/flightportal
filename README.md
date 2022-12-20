@@ -22,6 +22,7 @@ The libaries it needs are I think all part of the recommended prep above, but fo
 
 - adafruit_fakerequests
 - adafruit_requests
+- adafruit_bitmap_font
 - adafruit_io
 - adafruit_matrixportal
 - adafruit_minimqtt
