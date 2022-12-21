@@ -24,10 +24,8 @@ except ImportError:
 
 #How often to query fr24
 QUERY_DELAY=30
-#How long to pause after showing a flight
-AFTER_DELAY=30
 #Speed of scrolling text and animations (time between pixel moves)
-SCROLL_DELAY=0.03
+SCROLL_DELAY=0.02
 #Area to search for flights: top, bottom, left, right
 BOUNDS_BOX=secrets["bounds_box"]
 
@@ -117,36 +115,39 @@ def scroll(line):
         
 
 #Populate the labels, then scroll longer versions of the text
+#Keeps the info on the screen as long as the search loop keeps finding the same plane
+#Call clear_flight to blank out the display
 def display_flight(sf,lf,sr,lr,sa,la):
 
     matrixportal.display.show(g)
     flight_label.text=sf
     route_label.text=sr
     aircraft_label.text=sa
-    time.sleep(5)
+    time.sleep(3)
     
     flight_label.x=matrixportal.display.width+1
     flight_label.text=lf
     scroll(flight_label)
     flight_label.text=sf
     flight_label.x=1
-    time.sleep(5)
+    time.sleep(3)
     
     route_label.x=matrixportal.display.width+1
     route_label.text=lr
     scroll(route_label)
     route_label.text=sr
     route_label.x=1
-    time.sleep(5)
+    time.sleep(3)
     
     #aircraft_label.x=matrixportal.display.width+1
     #aircraft_label.text=la
     #scroll(aircraft_label)
     #aircraft_label.text=sa
     #aircraft_label.x=1
+    #time.sleep(3)
 
-    #Wait then blank out all the labels
-    time.sleep(AFTER_DELAY)
+#Blank the display when a flight is no longer found
+def clear_flight():
     flight_label.text=route_label.text=aircraft_label.text=""
 
 
@@ -200,57 +201,65 @@ def get_flights():
         print(e)
         return None, None, None, None, None
     if len(response)==3:
-        print ("Flight found.")
+        #print ("Flight found.")
         for flight_id, flight_info in response.items():
             #json has three main fields, we want the one that's a flight ID
             if not (flight_id=="version" or flight_id=="full_count"):
                 if len(flight_info)>13:
                     fn=flight_info[13]
                     fc=flight_info[8]
-                    #an=get_aircraft_name(fc)
-                    an=""
+                    an=get_aircraft_name(fc)
+                    #an=""
                     oc=flight_info[11]
                     dc=flight_info[12]
                     return fn,an,oc,dc,fc
     else:
-        print("No flights returned.")
+        #print("No flights returned.")
         return None,None,None,None,None
 
 #Actual doing of things
+last_flight=''
 while True:
 
-    print("Get flights...")
+    #print("Get flights...")
     flight_number,aircraft_name,origin_code,destination_code,flight_code=get_flights()
-    if flight_number:
 
-        airline,origin,destination=get_flight_details(flight_number)
+    if not flight_number==last_flight:
+        clear_flight()
+        if flight_number:
+            print("new flight found, clear display")
+
+            last_flight=flight_number
+
+            airline,origin,destination=get_flight_details(flight_number)
 
 
-        if airline:
-            flight=airline
-        else:
-            flight=flight_number
+            if airline:
+                flight=airline
+            else:
+                flight=flight_number
         
-        if origin_code and destination_code:
-            short_route=origin_code+"-"+destination_code
-        else:
-            short_route=''
+            if origin_code and destination_code:
+                short_route=origin_code+"-"+destination_code
+            else:
+                short_route=''
 
-        if origin and destination:
-            route=origin+" - "+destination
-        else: 
-            route=short_route
+            if origin and destination:
+                route=origin+" - "+destination
+            else: 
+                route=short_route
         
-        if aircraft_name:
-            aircraft=aircraft_name
+            if aircraft_name:
+                aircraft=aircraft_name
+            else:
+                aircraft=flight_code
+        
+            print(flight+" : "+route+" : "+aircraft)
+            plane_animation()
+            display_flight(flight_number,flight,short_route,route,flight_code,aircraft)
         else:
-            aircraft=flight_code
-        
-        print(flight)
-        print(route)
-        print(aircraft)
-        plane_animation()
-        display_flight(flight_number,flight,short_route,route,flight_code,aircraft)
+            print("no flight found, clear display")
+    else:
+        print("same flight found, so keep showing it")
     
     time.sleep(QUERY_DELAY)
-
