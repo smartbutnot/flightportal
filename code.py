@@ -22,12 +22,20 @@ except ImportError:
     print("Secrets including geo are kept in secrets.py, please add them there!")
     raise
 
-#How often to query fr24
+#How often to query fr24 - quick enough to catch a plane flying over, not so often as to cause any issues, hopefully
 QUERY_DELAY=30
-#Speed of scrolling text and animations (time between pixel moves)
-SCROLL_DELAY=0.02
-#Area to search for flights: top, bottom, left, right
+#Speed of scrolling text and animations (time between each pixel move)
+SCROLL_DELAY=0.04
+#Area to search for flights, see secrets file
 BOUNDS_BOX=secrets["bounds_box"]
+
+#Colours and timings
+ROW_ONE_COLOUR=0xEE82EE
+ROW_TWO_COLOUR=0x4B0082
+ROW_THREE_COLOUR=0xFFA500
+PLANE_COLOUR=0x4B0082
+#Time in seconds to wait between scrolling one label and the next
+PAUSE_BETWEEN_LABEL_SCROLLING=3
 
 #URLs
 FLIGHT_SEARCH_HEAD="https://data-live.flightradar24.com/zones/fcgi/feed.js?bounds="
@@ -56,7 +64,7 @@ matrixportal = MatrixPortal(
 #Little plane to scroll across when we find a flight overhead
 planeBmp = displayio.Bitmap(12, 12, 2)
 planePalette = displayio.Palette(2)
-planePalette[1] = 0x4B0082
+planePalette[1] = PLANE_COLOUR
 planePalette[0] = 0x000000
 planeBmp[6,0]=planeBmp[6,1]=planeBmp[5,1]=planeBmp[4,2]=planeBmp[5,2]=planeBmp[6,2]=1
 planeBmp[9,3]=planeBmp[5,3]=planeBmp[4,3]=planeBmp[3,3]=1
@@ -71,21 +79,21 @@ planeG.append(planeTg)
 #We can fit three rows of text on a panel, one label for each
 flight_label = adafruit_display_text.label.Label(
     FONT,
-    color=0xEE82EE,
+    color=ROW_ONE_COLOUR,
     text="")
 flight_label.x = 1
 flight_label.y = 4
 
 route_label = adafruit_display_text.label.Label(
     FONT,
-    color=0x4B0082,
+    color=ROW_TWO_COLOUR,
     text="")
 route_label.x = 1
 route_label.y = 15
 
 aircraft_label = adafruit_display_text.label.Label(
     FONT,
-    color=0xFFA500,
+    color=ROW_THREE_COLOUR,
     text="")
 aircraft_label.x = 1
 aircraft_label.y = 25
@@ -123,28 +131,28 @@ def display_flight(sf,lf,sr,lr,sa,la):
     flight_label.text=sf
     route_label.text=sr
     aircraft_label.text=sa
-    time.sleep(3)
+    time.sleep(PAUSE_BETWEEN_LABEL_SCROLLING)
     
     flight_label.x=matrixportal.display.width+1
     flight_label.text=lf
     scroll(flight_label)
     flight_label.text=sf
     flight_label.x=1
-    time.sleep(3)
+    time.sleep(PAUSE_BETWEEN_LABEL_SCROLLING)
     
     route_label.x=matrixportal.display.width+1
     route_label.text=lr
     scroll(route_label)
     route_label.text=sr
     route_label.x=1
-    time.sleep(3)
+    time.sleep(PAUSE_BETWEEN_LABEL_SCROLLING)
     
-    #aircraft_label.x=matrixportal.display.width+1
-    #aircraft_label.text=la
-    #scroll(aircraft_label)
-    #aircraft_label.text=sa
-    #aircraft_label.x=1
-    #time.sleep(3)
+    aircraft_label.x=matrixportal.display.width+1
+    aircraft_label.text=la
+    scroll(aircraft_label)
+    aircraft_label.text=sa
+    aircraft_label.x=1
+    time.sleep(PAUSE_BETWEEN_LABEL_SCROLLING)
 
 #Blank the display when a flight is no longer found
 def clear_flight():
@@ -263,3 +271,4 @@ while True:
         print("same flight found, so keep showing it")
     
     time.sleep(QUERY_DELAY)
+
