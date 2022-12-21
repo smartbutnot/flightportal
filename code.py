@@ -24,8 +24,6 @@ except ImportError:
 
 #How often to query fr24 - quick enough to catch a plane flying over, not so often as to cause any issues, hopefully
 QUERY_DELAY=30
-#Speed of scrolling text and animations (time between each pixel move)
-SCROLL_DELAY=0.04
 #Area to search for flights, see secrets file
 BOUNDS_BOX=secrets["bounds_box"]
 
@@ -36,6 +34,10 @@ ROW_THREE_COLOUR=0xFFA500
 PLANE_COLOUR=0x4B0082
 #Time in seconds to wait between scrolling one label and the next
 PAUSE_BETWEEN_LABEL_SCROLLING=3
+#speed plane animation will move - pause time per pixel shift in seconds
+PLANE_SPEED=0.04
+#speed text labels will move - pause time per pixel shift in seconds
+TEXT_SPEED=0.04
 
 #URLs
 FLIGHT_SEARCH_HEAD="https://data-live.flightradar24.com/zones/fcgi/feed.js?bounds="
@@ -109,7 +111,7 @@ def plane_animation():
     matrixportal.display.show(planeG)
     for i in range(matrixportal.display.width+24,-12,-1):
             planeG.x=i
-            time.sleep(SCROLL_DELAY)
+            time.sleep(PLANE_SPEED)
             #matrixportal.display.refresh(minimum_frames_per_second=0)
 
 #Scroll a label, start at the right edge of the screen and go left one pixel at a time
@@ -118,7 +120,7 @@ def scroll(line):
     line.x=matrixportal.display.width
     for i in range(matrixportal.display.width+1,0-line.bounding_box[2],-1):
         line.x=i
-        time.sleep(SCROLL_DELAY)
+        time.sleep(TEXT_SPEED)
         #matrixportal.display.refresh(minimum_frames_per_second=0)
         
 
