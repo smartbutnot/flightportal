@@ -13,7 +13,7 @@ To make one you will need:
 2. A P4, 64x32 RGB matrix panel (I get mine from Aliexpress)
 3. The case I designed (https://www.thingiverse.com/thing:5701517)
 4. An adafruit acrylic diffuser (https://www.adafruit.com/product/4749) - available various places
-5. 6 M5 screws
+5. 6 M3 screws (sorry, said M5 before but was looking at the wrong ones, my bad. Think mine are 8mm long, little bit more would be OK, shorter probably a problem)
 6. Optional: Uglu dashes to stick the diffuser on, the case holds mine on pretty well though (https://www.protapes.com/products/uglu-600-dashes-sheets)
 
 Prep the portal as detailed here (https://learn.adafruit.com/adafruit-matrixportal-m4/prep-the-matrixportal), put the code, secrets and icao files on, put your wifi details and the geo box you want to search in the secrets file, and you should be good to go!
