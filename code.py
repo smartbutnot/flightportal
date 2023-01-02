@@ -24,8 +24,9 @@ except ImportError:
 
 #How often to query fr24 - quick enough to catch a plane flying over, not so often as to cause any issues, hopefully
 QUERY_DELAY=30
-#Area to search for flights, see secrets file
+#Area and altidude to search for flights, see secrets file
 BOUNDS_BOX=secrets["bounds_box"]
+MAX_ALTITUDE=secrets["max_altitude"]
 
 #Colours and timings
 ROW_ONE_COLOUR=0xEE82EE
@@ -216,13 +217,16 @@ def get_flights():
             #json has three main fields, we want the one that's a flight ID
             if not (flight_id=="version" or flight_id=="full_count"):
                 if len(flight_info)>13:
-                    fn=flight_info[13]
-                    fc=flight_info[8]
-                    an=get_aircraft_name(fc)
-                    #an=""
-                    oc=flight_info[11]
-                    dc=flight_info[12]
-                    return fn,an,oc,dc,fc
+                    # Check if the flight is currently under the max altitude allowed.
+                    current_altitude=flight_info[4]
+                    if int(current_altitude)<int(MAX_ALTITUDE):
+                        fn=flight_info[13]
+                        fc=flight_info[8]
+                        an=get_aircraft_name(fc)
+                        #an=""
+                        oc=flight_info[11]
+                        dc=flight_info[12]
+                        return fn,an,oc,dc,fc
     else:
         #print("No flights returned.")
         return None,None,None,None,None

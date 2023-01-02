@@ -16,7 +16,7 @@ To make one you will need:
 5. 6 M3 screws (sorry, said M5 before but was looking at the wrong ones, my bad. Think mine are 8mm long, little bit more would be OK, shorter probably a problem)
 6. Optional: Uglu dashes to stick the diffuser on, the case holds mine on pretty well though (https://www.protapes.com/products/uglu-600-dashes-sheets)
 
-Prep the portal as detailed here (https://learn.adafruit.com/adafruit-matrixportal-m4/prep-the-matrixportal), put the code, secrets and icao files on, put your wifi details and the geo box you want to search in the secrets file, and you should be good to go!
+Prep the portal as detailed here (https://learn.adafruit.com/adafruit-matrixportal-m4/prep-the-matrixportal), put the code, secrets and icao files on, put your wifi details, the geo box and the max altitude you want to search in the secrets file, and you should be good to go!
 
 The libaries it needs are I think all part of the recommended prep above, but for info they are:
 
