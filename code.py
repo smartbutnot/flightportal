@@ -61,6 +61,7 @@ rheaders = {
 matrixportal = MatrixPortal(
     headers=rheaders,
     status_neopixel=board.NEOPIXEL,
+    rotation=0,
     debug=False
 )
 
