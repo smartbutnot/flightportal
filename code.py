@@ -226,8 +226,11 @@ def get_flight_details(fn):
             print(e)
             return False
 
-    print("Details lookup saved "+str(trail_end)+" bytes.")
-    return True
+    if trail_end:
+        print("Details lookup saved "+str(trail_end)+" bytes.")
+        return True
+    else:
+        return False
 
 # Look at the byte array that fetch_details saved into and extract any fields we want
 def parse_details_json():
