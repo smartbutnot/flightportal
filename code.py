@@ -335,7 +335,7 @@ def get_flights():
     matrixportal.url=FLIGHT_SEARCH_URL
     try:
         response = json.loads(matrixportal.fetch())
-    except (RuntimeError,OSError, HttpError) as e:
+    except (RuntimeError,OSError, HttpError, ValueError) as e:
         print("Error--------------------------------------")
         print(e)
         return False
