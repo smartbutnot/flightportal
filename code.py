@@ -183,6 +183,7 @@ def get_flight_details(fn):
     global json_size
     byte_counter=0
     chunk_length=1024
+    success=False
 
     # zero out any old data in the byte array
     for i in range(0,json_size):
@@ -208,29 +209,31 @@ def get_flight_details(fn):
             # if it does, find the first/most recent of the many trail entries, giving us things like speed and heading
             if not trail_start==-1:
                 # work out the location of the first } character after the "trail:" tag, giving us the first entry
-                trail_end=json_bytes[trail_start:].find((b"}")) + trail_start
-                # characters to add to make the whole JSON object valid, since we're cutting off the end
-                closing_bytes=b'}]}'
-                for i in range (0,len(closing_bytes)):
-                    json_bytes[trail_end+i]=closing_bytes[i]
-                # zero out the rest
-                for i in range(trail_end+3,json_size):
-                    json_bytes[i]=0
-                # print(json_bytes.decode('utf-8'))
+                trail_end=json_bytes[trail_start:].find((b"}"))
+                if not trail_end==-1:
+                    trail_end+=trail_start
+                    # characters to add to make the whole JSON object valid, since we're cutting off the end
+                    closing_bytes=b'}]}'
+                    for i in range (0,len(closing_bytes)):
+                        json_bytes[trail_end+i]=closing_bytes[i]
+                    # zero out the rest
+                    for i in range(trail_end+3,json_size):
+                        json_bytes[i]=0
+                    # print(json_bytes.decode('utf-8'))
 
-                # Stop reading chunks
-                break
+                    # Stop reading chunks
+                    print("Details lookup saved "+str(trail_end)+" bytes.")
+                    return True
     # Handle occasional URL fetching errors            
     except (RuntimeError, OSError, HttpError) as e:
             print("Error--------------------------------------------------")
             print(e)
             return False
 
-    if trail_end:
-        print("Details lookup saved "+str(trail_end)+" bytes.")
-        return True
-    else:
-        return False
+    #If we got here we got through all the JSON without finding the right trail entries
+    print("Failed to find a valid trail entry in JSON")
+    return False
+    
 
 # Look at the byte array that fetch_details saved into and extract any fields we want
 def parse_details_json():
@@ -385,4 +388,3 @@ while True:
     
     time.sleep(QUERY_DELAY)
     gc.collect()
-
