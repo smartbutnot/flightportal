@@ -15,6 +15,18 @@ import rgbmatrix
 import terminalio
 import gc
 
+import busio
+from digitalio import DigitalInOut
+import neopixel
+from adafruit_esp32spi import adafruit_esp32spi
+from adafruit_esp32spi import adafruit_esp32spi_wifimanager
+
+from microcontroller import watchdog as w
+from watchdog import WatchDogMode
+
+w.timeout=16 # timeout in seconds
+w.mode = WatchDogMode.RESET
+
 FONT=terminalio.FONT
 
 try:
@@ -57,10 +69,20 @@ rheaders = {
      "accept": "application/json"
 }
 
+esp32_cs = DigitalInOut(board.ESP_CS)
+esp32_ready = DigitalInOut(board.ESP_BUSY)
+esp32_reset = DigitalInOut(board.ESP_RESET)
+spi = busio.SPI(board.SCK, board.MOSI, board.MISO)
+esp = adafruit_esp32spi.ESP_SPIcontrol(spi, esp32_cs, esp32_ready, esp32_reset)
+status_light = neopixel.NeoPixel(
+    board.NEOPIXEL, 1, brightness=0.2
+)
+wifi = adafruit_esp32spi_wifimanager.ESPSPI_WiFiManager(esp, secrets, status_light,debug=False,attempts=1)
+
 # Top level matrixportal object
 matrixportal = MatrixPortal(
     headers=rheaders,
-    status_neopixel=board.NEOPIXEL,
+    esp=esp,
     rotation=0,
     debug=False
 )
@@ -126,6 +148,7 @@ def plane_animation():
     matrixportal.display.show(planeG)
     for i in range(matrixportal.display.width+24,-12,-1):
             planeG.x=i
+            w.feed()
             time.sleep(PLANE_SPEED)
             #matrixportal.display.refresh(minimum_frames_per_second=0)
 
@@ -135,6 +158,7 @@ def scroll(line):
     line.x=matrixportal.display.width
     for i in range(matrixportal.display.width+1,0-line.bounding_box[2],-1):
         line.x=i
+        w.feed()
         time.sleep(TEXT_SPEED)
         #matrixportal.display.refresh(minimum_frames_per_second=0)
         
@@ -333,14 +357,39 @@ def parse_details_json():
     return True
 
 
+def checkConnection():
+    print("Check and reconnect WiFi")
+    attempts=10
+    attempt=1
+    while (not esp.status == adafruit_esp32spi.WL_CONNECTED) and attempt<attempts:
+        print("Connect attempt "+str(attempt)+" of "+str(attempts))
+        print("Reset ESP...")
+        w.feed()
+        wifi.reset()
+        print("Attempt WiFi connect...")
+        w.feed()
+        try:
+            wifi.connect()
+        except OSError as e:
+            print(e.__class__.__name__+"--------------------------------------")
+            print(e)
+        attempt+=1
+    if esp.status == adafruit_esp32spi.WL_CONNECTED:
+        print("Successfully connected.")
+    else:
+        print("Failed to connect.")
+
+
 # Look for flights overhead
 def get_flights():
     matrixportal.url=FLIGHT_SEARCH_URL
     try:
-        response = json.loads(matrixportal.fetch())
-    except (RuntimeError,OSError, HttpError, ValueError) as e:
-        print("Error--------------------------------------")
+        #response = json.loads(matrixportal.fetch())
+        response=requests.get(url=FLIGHT_SEARCH_URL,headers=rheaders).json()
+    except (RuntimeError,OSError, HttpError, ValueError, requests.OutOfRetries) as e:
+        print(e.__class__.__name__+"--------------------------------------")
         print(e)
+        checkConnection()
         return False
     if len(response)==3:
         #print ("Flight found.")
@@ -353,15 +402,23 @@ def get_flights():
         return False
 
 
+
 # Actual doing of things - loop forever quering fr24, processing any results and waiting to query again
+
+checkConnection()
 
 last_flight=''
 while True:
+
+    #checkConnection()
+
+    w.feed()
 
     #print("memory free: " + str(gc.mem_free()))
 
     #print("Get flights...")
     flight_id=get_flights()
+    w.feed()
     
 
     if flight_id:
@@ -371,6 +428,7 @@ while True:
             print("New flight "+flight_id+" found, clear display")
             clear_flight()
             if get_flight_details(flight_id):
+                w.feed()
                 gc.collect()
                 if parse_details_json():
                     gc.collect()
@@ -383,8 +441,13 @@ while True:
             
             last_flight=flight_id
     else:
-        print("No flights found, clear display")
+        #print("No flights found, clear display")
         clear_flight()
     
-    time.sleep(QUERY_DELAY)
+    time.sleep(5)
+
+
+    for i in range(0,QUERY_DELAY,+5):
+        time.sleep(5)
+        w.feed()
     gc.collect()
