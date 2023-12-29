@@ -472,40 +472,49 @@ while True:
     print("memory free: " + str(gc.mem_free()))
 
     print("Get flights...")
-    flight_id, origin, destination = get_flights(requests_session, FLIGHT_SEARCH_URL, rheaders)
+    flight_data = get_flights(requests_session, FLIGHT_SEARCH_URL, rheaders)
     w.feed()
 
-    if flight_id:
-        if flight_id == last_flight:
-            print("Same flight found, so keep showing it")
-        else:
-            print("New flight " + flight_id + " found, clear display")
-            clear_flight()
-            if get_flight_details(requests_session, flight_id):
-                w.feed()
-                gc.collect()
-                if parse_details_json():
-                    gc.collect()
-                    # Check if the flight is taking off or landing at HOME_AIRPORT
-                    if origin == HOME_AIRPORT:
-                        # Flight is taking off from HOME_AIRPORT
-                        plane_animation_take_off()
-                    elif destination == HOME_AIRPORT:
-                        # Flight is landing at HOME_AIRPORT
-                        plane_animation_landing()
-                    else:
-                        # Neither taking off nor landing at HOME_AIRPORT
-                        plane_animation()
+    # Check if get_flights returned valid data
+    if flight_data and isinstance(flight_data, tuple) and len(flight_data) == 3:
+        flight_id, origin, destination = flight_data
 
-                    display_flight()
-                else:
-                    print("error parsing JSON, skip displaying this flight")
+        # Rest of the code for handling a valid flight
+        if flight_id:
+            if flight_id == last_flight:
+                print("Same flight found, so keep showing it")
             else:
-                print("error loading details, skip displaying this flight")
-            
-            last_flight = flight_id
+                print("New flight " + flight_id + " found, clear display")
+                clear_flight()
+                if get_flight_details(requests_session, flight_id):
+                    w.feed()
+                    gc.collect()
+                    if parse_details_json():
+                        gc.collect()
+                        # Check if the flight is taking off or landing at HOME_AIRPORT
+                        if origin == HOME_AIRPORT:
+                            # Flight is taking off from HOME_AIRPORT
+                            plane_animation_take_off()
+                        elif destination == HOME_AIRPORT:
+                            # Flight is landing at HOME_AIRPORT
+                            plane_animation_landing()
+                        else:
+                            # Neither taking off nor landing at HOME_AIRPORT
+                            plane_animation()
+
+                        display_flight()
+                    else:
+                        print("error parsing JSON, skip displaying this flight")
+                else:
+                    print("error loading details, skip displaying this flight")
+                
+                last_flight = flight_id
+        else:
+            print("No valid flight ID found, skip displaying this flight")
+            clear_flight()
+
     else:
-        print("No flights found, clear display")
+        print("No flights found or error in fetching flight data, clear display")
         clear_flight()
     
     time.sleep(5)
