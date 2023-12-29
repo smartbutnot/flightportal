@@ -429,97 +429,83 @@ def checkConnection():
         print(f"Failed to connect to WiFi: {e}")
         return False
 
+# Define get_flights to return a list of all flights
 def get_flights(requests_session, FLIGHT_SEARCH_URL, rheaders):
     print("Starting get_flights function")
     print(f"Flight Search URL: {FLIGHT_SEARCH_URL}")
 
     try:
-        response = requests_session.get(FLIGHT_SEARCH_URL, headers=rheaders).json()
-        print("Received response from Flight Radar API")
-        print(response)
-        for flight_id, flight_info in response.items():
-            if not (flight_id == "version" or flight_id == "full_count"):
-                if len(flight_info) > 13:
-                    # Return flight ID along with origin and destination
-                    origin = flight_info[11]
-                    destination = flight_info[12]
-                    return flight_id, origin, destination
+        response = requests_session.get(FLIGHT_SEARCH_URL, headers=rheaders, timeout=10)
+        if response.status_code == 200:
+            data = response.json()
+            flights = []
+            for flight_id, flight_info in data.items():
+                if flight_id not in ["version", "full_count"]:
+                    if len(flight_info) > 13:
+                        origin = flight_info[11]
+                        destination = flight_info[12]
+                        flights.append((flight_id, origin, destination))
+            return flights
+        else:
+            print("Error in API response. Status Code:", response.status_code)
+            return []
+    except requests.exceptions.Timeout:
+        print("Request timed out")
+        return []
     except Exception as e:
         print(f"Exception caught: {e}")
-        return False, None, None
+        return []
 
 # Initialize WiFi and Requests
 requests_session = setup_wifi_and_requests()
 
 # Your FLIGHT_SEARCH_URL and headers
-FLIGHT_SEARCH_URL=FLIGHT_SEARCH_HEAD+BOUNDS_BOX+FLIGHT_SEARCH_TAIL
+FLIGHT_SEARCH_URL = FLIGHT_SEARCH_HEAD + BOUNDS_BOX + FLIGHT_SEARCH_TAIL
 rheaders = {
-     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:106.0) Gecko/20100101 Firefox/106.0",
-     "cache-control": "no-store, no-cache, must-revalidate, post-check=0, pre-check=0",
-     "accept": "application/json"
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:106.0) Gecko/20100101 Firefox/106.0",
+    "cache-control": "no-store, no-cache, must-revalidate, post-check=0, pre-check=0",
+    "accept": "application/json"
 }
 
-# Call get_flights with the initialized requests session
-get_flights(requests_session, FLIGHT_SEARCH_URL, rheaders)
-
-# Actual doing of things - loop forever quering fr24, processing any results and waiting to query again
-checkConnection()
-
-last_flight=''
+# Main loop
+last_flight = ''
 while True:
+    checkConnection()
     w.feed()
-
     print("memory free: " + str(gc.mem_free()))
 
-    print("Get flights...")
-    flight_data = get_flights(requests_session, FLIGHT_SEARCH_URL, rheaders)
-    w.feed()
-
-    # Check if get_flights returned valid data
-    if flight_data and isinstance(flight_data, tuple) and len(flight_data) == 3:
-        flight_id, origin, destination = flight_data
-
-        # Rest of the code for handling a valid flight
-        if flight_id:
-            if flight_id == last_flight:
-                print("Same flight found, so keep showing it")
-            else:
-                print("New flight " + flight_id + " found, clear display")
-                clear_flight()
-                if get_flight_details(requests_session, flight_id):
-                    w.feed()
-                    gc.collect()
-                    if parse_details_json():
-                        gc.collect()
-                        # Check if the flight is taking off or landing at HOME_AIRPORT
-                        if origin == HOME_AIRPORT:
-                            # Flight is taking off from HOME_AIRPORT
-                            plane_animation_take_off()
-                        elif destination == HOME_AIRPORT:
-                            # Flight is landing at HOME_AIRPORT
-                            plane_animation_landing()
-                        else:
-                            # Neither taking off nor landing at HOME_AIRPORT
-                            plane_animation()
-
-                        display_flight()
-                    else:
-                        print("error parsing JSON, skip displaying this flight")
-                else:
-                    print("error loading details, skip displaying this flight")
-                
-                last_flight = flight_id
-        else:
-            print("No valid flight ID found, skip displaying this flight")
+    flights = get_flights(requests_session, FLIGHT_SEARCH_URL, rheaders)
+    
+    for flight_id, origin, destination in flights:
+        if flight_id != last_flight:
+            print("New flight " + flight_id + " found, clear display")
             clear_flight()
 
-    else:
-        print("No flights found or error in fetching flight data, clear display")
-        clear_flight()
-    
-    time.sleep(5)
+            # Clear memory associated with the last flight
+            last_flight = flight_id  # Update last flight ID
+            gc.collect()  # Explicitly call garbage collector
 
-    for i in range(0, QUERY_DELAY, +5):
+            if get_flight_details(requests_session, flight_id):
+                w.feed()
+                gc.collect()
+                if parse_details_json():
+                    gc.collect()
+                    if origin == HOME_AIRPORT:
+                        plane_animation_take_off()
+                    elif destination == HOME_AIRPORT:
+                        plane_animation_landing()
+                    else:
+                        plane_animation()
+
+                    display_flight()
+                else:
+                    print("Error parsing JSON, skip displaying this flight")
+            else:
+                print("Error loading details, skip displaying this flight")
+            # Clear the memory after processing each flight
+            gc.collect()
+
+    time.sleep(0)
+    for i in range(0, QUERY_DELAY, +1):
         time.sleep(1)
         w.feed()
-    gc.collect()
