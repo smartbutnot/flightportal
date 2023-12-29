@@ -1,8 +1,10 @@
+import os
 import time
+from random import randrange
 import board
 import terminalio
-from adafruit_esp32s3 import ESP32S3SPI
-from adafruit_esp32s3.wifimanager import ESP32S3SPI_WiFiManager
+from adafruit_matrixportal.matrixportal import MatrixPortal
+from adafruit_portalbase.network import HttpError
 import adafruit_requests as requests
 import json
 
@@ -18,10 +20,14 @@ import busio
 from digitalio import DigitalInOut
 import neopixel
 from adafruit_esp32spi import adafruit_esp32spi
-from adafruit_esp32spi import adafruit_esp32spi_wifimanager
 
 from microcontroller import watchdog as w
 from watchdog import WatchDogMode
+
+import wifi
+import socketpool
+import ssl
+import adafruit_requests
 
 w.timeout=16 # timeout in seconds
 w.mode = WatchDogMode.RESET
@@ -38,6 +44,17 @@ except ImportError:
 QUERY_DELAY=30
 #Area to search for flights, see secrets file
 BOUNDS_BOX=secrets["bounds_box"]
+
+wifi.radio.connect(os.getenv("CIRCUITPY_WIFI_SSID"), os.getenv("CIRCUITPY_WIFI_PASSWORD"))
+print(f"Connected to {os.getenv('CIRCUITPY_WIFI_SSID')}")
+
+def setup_wifi_and_requests():
+    pool = socketpool.SocketPool(wifi.radio)
+    requests = adafruit_requests.Session(pool, ssl.create_default_context())
+    return requests
+
+# Initialize WiFi and Requests
+requests_session = setup_wifi_and_requests()
 
 # Colours and timings
 ROW_ONE_COLOUR=0xEE82EE
@@ -68,18 +85,14 @@ rheaders = {
      "accept": "application/json"
 }
 
-spi = busio.SPI(board.SCK, board.MOSI, board.MISO)
-esp32_cs = DigitalInOut(board.ESP_CS)
-esp32_ready = DigitalInOut(board.ESP_BUSY)
-esp32_reset = DigitalInOut(board.ESP_RESET)
-esp32 = ESP32S3SPI(spi, esp32_cs, esp32_ready, esp32_reset)
-status_light = neopixel.NeoPixel(board.NEOPIXEL, 1, brightness=0.2)
-wifi = ESP32S3SPI_WiFiManager(esp32, secrets, status_light)
+
+status_light = neopixel.NeoPixel(
+    board.NEOPIXEL, 1, brightness=0.2
+)
 
 # Top level matrixportal object
 matrixportal = MatrixPortal(
     headers=rheaders,
-    esp=esp,
     rotation=0,
     debug=False
 )
@@ -196,23 +209,20 @@ def clear_flight():
 
 
 # Take the flight ID we found with a search, and load details about it
-def get_flight_details(fn):
-
-    # the JSON from FR24 is too big for the matrixportal memory to handle. So we load it in chunks into our static array,
-    # as far as the big "trails" section of waypoints at the end of it, then ignore most of that part. Should be about 9KB, we have 14K before we run out of room..
+def get_flight_details(requests_session, fn):
     global json_bytes
     global json_size
-    byte_counter=0
-    chunk_length=1024
-    success=False
+    byte_counter = 0
+    chunk_length = 1024
+
 
     # zero out any old data in the byte array
-    for i in range(0,json_size):
-        json_bytes[i]=0
+    for i in range(json_size):
+        json_bytes[i] = 0
 
     # Get the URL response one chunk at a time
     try:
-        response=requests.get(url=FLIGHT_LONG_DETAILS_HEAD+fn,headers=rheaders)
+        response = requests_session.get(FLIGHT_LONG_DETAILS_HEAD + fn, headers=rheaders)
         for chunk in response.iter_content(chunk_size=chunk_length):
 
             # if the chunk will fit in the byte array, add it
@@ -246,10 +256,10 @@ def get_flight_details(fn):
                     print("Details lookup saved "+str(trail_end)+" bytes.")
                     return True
     # Handle occasional URL fetching errors            
-    except (RuntimeError, OSError, HttpError) as e:
-            print("Error--------------------------------------------------")
-            print(e)
-            return False
+    except Exception as e:
+        print("Error--------------------------------------------------")
+        print(e)
+        return False
 
     #If we got here we got through all the JSON without finding the right trail entries
     print("Failed to find a valid trail entry in JSON")
@@ -355,48 +365,64 @@ def parse_details_json():
 
 
 def checkConnection():
-    print("Check and reconnect WiFi")
-    attempts=10
-    attempt=1
-    while (not esp.status == adafruit_esp32spi.WL_CONNECTED) and attempt<attempts:
-        print("Connect attempt "+str(attempt)+" of "+str(attempts))
-        print("Reset ESP...")
-        w.feed()
-        wifi.reset()
-        print("Attempt WiFi connect...")
-        w.feed()
-        try:
-            wifi.connect()
-        except OSError as e:
-            print(e.__class__.__name__+"--------------------------------------")
-            print(e)
-        attempt+=1
-    if esp.status == adafruit_esp32spi.WL_CONNECTED:
-        print("Successfully connected.")
-    else:
-        print("Failed to connect.")
+    print("Checking and reconnecting WiFi if necessary.")
 
+    ssid = os.getenv("CIRCUITPY_WIFI_SSID")
+    password = os.getenv("CIRCUITPY_WIFI_PASSWORD")
+
+    if not ssid or not password:
+        print("WiFi SSID or password not set.")
+        return False
+
+    try:
+        # Check if already connected
+        if not wifi.radio.ipv4_address:
+            print("WiFi not connected. Attempting to connect...")
+            wifi.radio.connect(ssid, password)
+            print(f"Connected to {ssid}")
+        else:
+            print(f"Already connected to {ssid}")
+        return True
+    except Exception as e:
+        print(f"Failed to connect to WiFi: {e}")
+        return False
 
 # Look for flights overhead
-def get_flights():
-    matrixportal.url=FLIGHT_SEARCH_URL
+#def setup_wifi_and_requests():
+#    pool = socketpool.SocketPool(wifi.radio)
+#    requests = adafruit_requests.Session(pool, ssl.create_default_context())
+#    return requests
+
+def get_flights(requests_session, FLIGHT_SEARCH_URL, rheaders):
+    print("Starting get_flights function")
+    print(f"Flight Search URL: {FLIGHT_SEARCH_URL}")
+
     try:
-        #response = json.loads(matrixportal.fetch())
-        response=requests.get(url=FLIGHT_SEARCH_URL,headers=rheaders).json()
-    except (RuntimeError,OSError, HttpError, ValueError, requests.OutOfRetries) as e:
-        print(e.__class__.__name__+"--------------------------------------")
-        print(e)
-        checkConnection()
-        return False
-    if len(response)==3:
-        #print ("Flight found.")
+        response = requests_session.get(FLIGHT_SEARCH_URL, headers=rheaders).json()
+        print("Received response from Flight Radar API")
+        print(response)
         for flight_id, flight_info in response.items():
-            # the JSON has three main fields, we want the one that's a flight ID
-            if not (flight_id=="version" or flight_id=="full_count"):
-                if len(flight_info)>13:
+            if not (flight_id == "version" or flight_id == "full_count"):
+                if len(flight_info) > 13:
                     return flight_id
-    else:
+    except Exception as e:
+        print(f"Exception caught: {e}")
         return False
+
+
+# Initialize WiFi and Requests
+requests_session = setup_wifi_and_requests()
+
+# Your FLIGHT_SEARCH_URL and headers
+FLIGHT_SEARCH_URL=FLIGHT_SEARCH_HEAD+BOUNDS_BOX+FLIGHT_SEARCH_TAIL
+rheaders = {
+     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:106.0) Gecko/20100101 Firefox/106.0",
+     "cache-control": "no-store, no-cache, must-revalidate, post-check=0, pre-check=0",
+     "accept": "application/json"
+}
+
+# Call get_flights with the initialized requests session
+get_flights(requests_session, FLIGHT_SEARCH_URL, rheaders)
 
 
 
@@ -405,26 +431,23 @@ def get_flights():
 checkConnection()
 
 last_flight=''
+# Main loop
 while True:
-
-    #checkConnection()
-
     w.feed()
 
-    #print("memory free: " + str(gc.mem_free()))
+    print("memory free: " + str(gc.mem_free()))
 
-    #print("Get flights...")
-    flight_id=get_flights()
+    print("Get flights...")
+    flight_id = get_flights(requests_session, FLIGHT_SEARCH_URL, rheaders)
     w.feed()
-    
 
     if flight_id:
-        if flight_id==last_flight:
+        if flight_id == last_flight:
             print("Same flight found, so keep showing it")
         else:
-            print("New flight "+flight_id+" found, clear display")
+            print("New flight " + flight_id + " found, clear display")
             clear_flight()
-            if get_flight_details(flight_id):
+            if get_flight_details(requests_session, flight_id):
                 w.feed()
                 gc.collect()
                 if parse_details_json():
@@ -436,15 +459,14 @@ while True:
             else:
                 print("error loading details, skip displaying this flight")
             
-            last_flight=flight_id
+            last_flight = flight_id
     else:
-        #print("No flights found, clear display")
+        print("No flights found, clear display")
         clear_flight()
     
     time.sleep(5)
 
-
-    for i in range(0,QUERY_DELAY,+5):
+    for i in range(0, QUERY_DELAY, +5):
         time.sleep(5)
         w.feed()
     gc.collect()
