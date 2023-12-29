@@ -1,3 +1,19 @@
+#s3 libs
+
+neopixel.mpy
+adafruit_ticks.mpy
+adafruit_requests.mpy
+adafruit_minimqtt
+adafruit_portalbase
+adafruit_matrixportal
+adafruit_json_stream.mpy
+adafruit_io
+adafruit_fakerequests.mpy
+adafruit_esp32spi
+adafruit_display_text
+adafruit_datetime.mpy
+adafruit_bitmap_font
+
 # flightportal
 Project for displaying the details of planes overhead on an Adafruit MatrixPortal and LED matrix
 
