@@ -1,21 +1,17 @@
-#s3 libs
-
-neopixel.mpy
-adafruit_ticks.mpy
-adafruit_requests.mpy
-adafruit_minimqtt
-adafruit_portalbase
-adafruit_matrixportal
-adafruit_json_stream.mpy
-adafruit_io
-adafruit_fakerequests.mpy
-adafruit_esp32spi
-adafruit_display_text
-adafruit_datetime.mpy
-adafruit_bitmap_font
-
 # flightportal
-Project for displaying the details of planes overhead on an Adafruit MatrixPortal and LED matrix
+
+## credit to https://github.com/smartbutnot/
+
+### Additions
+- I have updated to work on Adafruit MatrixPortal S3
+- Added home airport variable 
+- New animations for take off and landing based on home airport
+
+### To do:
+- Add Airline logos
+- Add runways for take off and landing
+
+Project for displaying the details of planes overhead on an Adafruit MatrixPortal S3 and LED matrix
 
 (video sped up to make the file fit, the speeds and delays are configurable anyway)
 
@@ -25,27 +21,32 @@ Uses an Adafruit MatrixPortal and a 64x32 LED/RGB Matrix (P4), and some fairly h
 
 To make one you will need:
 
-1. A MatrixPortal (https://www.adafruit.com/product/4745)
+1. Adafruit MatrixPortal S3 (https://learn.adafruit.com/adafruit-matrixportal-s3)
 2. A P4, 64x32 RGB matrix panel (I get mine from Aliexpress)
 3. The case I designed (https://www.thingiverse.com/thing:5701517)
 4. An adafruit acrylic diffuser (https://www.adafruit.com/product/4749) - available various places
 5. 6 M3 screws (sorry, said M5 before but was looking at the wrong ones, my bad. Think mine are 8mm long, little bit more would be OK, shorter probably a problem)
 6. Optional: Uglu dashes to stick the diffuser on, the case holds mine on pretty well though (https://www.protapes.com/products/uglu-600-dashes-sheets)
 
-Prep the portal as detailed here (https://learn.adafruit.com/adafruit-matrixportal-m4/prep-the-matrixportal), put the code and secrets files on, put your wifi details and the geo box you want to search in the secrets file, and you should be good to go!
+Prep the portal as detailed here (https://learn.adafruit.com/adafruit-matrixportal-s3/prep-the-matrixportal), put the code and secrets files on, put your wifi details and the geo box you want to search in the secrets file, and you should be good to go!
 
 If you'd like to change the layout, colours or the flight info displayed, all that is pretty configurable, have a look at code.py. Hopefully the comments are fairly self explanatory if you're happy hacking around with python.
 
 The libaries it needs are I think all part of the recommended prep above, but for info they are:
 
-- adafruit_fakerequests
-- adafruit_requests
-- adafruit_bitmap_font
-- adafruit_io
-- adafruit_matrixportal
+- neopixel.mpy
+- adafruit_ticks.mpy
+- adafruit_requests.mpy
 - adafruit_minimqtt
-- adafruit_display_text
 - adafruit_portalbase
+- adafruit_matrixportal
+- adafruit_json_stream.mpy
+- adafruit_io
+- adafruit_fakerequests.mpy
+- adafruit_esp32spi
+- adafruit_display_text
+- adafruit_datetime.mpy
+- adafruit_bitmap_font
 
 For power, the easiest thing is to use the cable that came with your matrix panel, as long as it has two prongs that go to the screws on the matrixportal. All that's needed is for the portal to connect to the power port on the panel - we're not using much power here (I clock it at about 2w). Any decent usb power supply connected to the portal should do it.
 

@@ -44,6 +44,7 @@ except ImportError:
 QUERY_DELAY=30
 #Area to search for flights, see secrets file
 BOUNDS_BOX=secrets["bounds_box"]
+HOME_AIRPORT=secrets["home_airport"]
 
 wifi.radio.connect(os.getenv("CIRCUITPY_WIFI_SSID"), os.getenv("CIRCUITPY_WIFI_PASSWORD"))
 print(f"Connected to {os.getenv('CIRCUITPY_WIFI_SSID')}")
@@ -64,7 +65,7 @@ PLANE_COLOUR=0x4B0082
 # Time in seconds to wait between scrolling one label and the next
 PAUSE_BETWEEN_LABEL_SCROLLING=3
 # speed plane animation will move - pause time per pixel shift in seconds
-PLANE_SPEED=0.04
+PLANE_SPEED=0.03
 # speed text labels will move - pause time per pixel shift in seconds
 TEXT_SPEED=0.04
 
@@ -72,8 +73,6 @@ TEXT_SPEED=0.04
 FLIGHT_SEARCH_HEAD="https://data-cloud.flightradar24.com/zones/fcgi/feed.js?bounds="
 FLIGHT_SEARCH_TAIL="&faa=1&satellite=1&mlat=1&flarm=1&adsb=1&gnd=0&air=1&vehicles=0&estimated=0&maxage=14400&gliders=0&stats=0&ems=1&limit=1"
 FLIGHT_SEARCH_URL=FLIGHT_SEARCH_HEAD+BOUNDS_BOX+FLIGHT_SEARCH_TAIL
-# Deprecated URL used to return less JSON than the long details URL, but can give ambiguous results
-# FLIGHT_DETAILS_HEAD="https://api.flightradar24.com/common/v1/flight/list.json?&fetchBy=flight&page=1&limit=1&maxage=14400&query="
 
 # Used to get more flight details with a fr24 flight ID from the initial search
 FLIGHT_LONG_DETAILS_HEAD="https://data-live.flightradar24.com/clickhandler/?flight="
@@ -101,20 +100,79 @@ matrixportal = MatrixPortal(
 json_size=14336
 json_bytes=bytearray(json_size)
 
-# Little plane to scroll across when we find a flight overhead
+# Little plane to scroll across when we find a flight or taking off
 planeBmp = displayio.Bitmap(12, 12, 2)
 planePalette = displayio.Palette(2)
 planePalette[1] = PLANE_COLOUR
 planePalette[0] = 0x000000
-planeBmp[6,0]=planeBmp[6,1]=planeBmp[5,1]=planeBmp[4,2]=planeBmp[5,2]=planeBmp[6,2]=1
-planeBmp[9,3]=planeBmp[5,3]=planeBmp[4,3]=planeBmp[3,3]=1
-planeBmp[1,4]=planeBmp[2,4]=planeBmp[3,4]=planeBmp[4,4]=planeBmp[5,4]=planeBmp[6,4]=planeBmp[7,4]=planeBmp[8,4]=planeBmp[9,4]=1
-planeBmp[1,5]=planeBmp[2,5]=planeBmp[3,5]=planeBmp[4,5]=planeBmp[5,5]=planeBmp[6,5]=planeBmp[7,5]=planeBmp[8,5]=planeBmp[9,5]=1
-planeBmp[9,6]=planeBmp[5,6]=planeBmp[4,6]=planeBmp[3,6]=1
-planeBmp[6,9]=planeBmp[6,8]=planeBmp[5,8]=planeBmp[4,7]=planeBmp[5,7]=planeBmp[6,7]=1
-planeTg= displayio.TileGrid(planeBmp, pixel_shader=planePalette)
-planeG=displayio.Group(x=matrixportal.display.width+12,y=10)
+planeBmp[5,0] = planeBmp[5,1] = planeBmp[6,1] = planeBmp[7,2] = planeBmp[6,2] = planeBmp[5,2] = 1
+planeBmp[2,3] = planeBmp[6,3] = planeBmp[7,3] = planeBmp[8,3] = 1
+planeBmp[10,4] = planeBmp[9,4] = planeBmp[8,4] = planeBmp[7,4] = planeBmp[6,4] = planeBmp[5,4] = planeBmp[4,4] = planeBmp[3,4] = planeBmp[2,4] = 1
+planeBmp[10,5] = planeBmp[9,5] = planeBmp[8,5] = planeBmp[7,5] = planeBmp[6,5] = planeBmp[5,5] = planeBmp[4,5] = planeBmp[3,5] = planeBmp[2,5] = 1
+planeBmp[2,6] = planeBmp[6,6] = planeBmp[7,6] = planeBmp[8,6] = 1
+planeBmp[5,9] = planeBmp[5,8] = planeBmp[6,8] = planeBmp[7,7] = planeBmp[6,7] = planeBmp[5,7] = 1
+planeTg = displayio.TileGrid(planeBmp, pixel_shader=planePalette)
+planeG = displayio.Group(x=matrixportal.display.width + 12, y=10)
 planeG.append(planeTg)
+
+# Create bitmap and palette for the landing plane (reversed version)
+landingBmp = displayio.Bitmap(12, 12, 2)
+landingBmp = displayio.Bitmap(12, 12, 2)
+landingPalette = displayio.Palette(2)
+landingPalette[1] = PLANE_COLOUR
+landingPalette[0] = 0x000000
+landingBmp[5,11] = landingBmp[5,10] = landingBmp[6,10] = landingBmp[7,9] = landingBmp[6,9] = landingBmp[5,9] = 1
+landingBmp[2,8] = landingBmp[6,8] = landingBmp[7,8] = landingBmp[8,8] = 1
+landingBmp[10,7] = landingBmp[9,7] = landingBmp[8,7] = landingBmp[7,7] = landingBmp[6,7] = landingBmp[5,7] = landingBmp[4,7] = landingBmp[3,7] = landingBmp[2,7] = 1
+landingBmp[10,6] = landingBmp[9,6] = landingBmp[8,6] = landingBmp[7,6] = landingBmp[6,6] = landingBmp[5,6] = landingBmp[4,6] = landingBmp[3,6] = landingBmp[2,6] = 1
+landingBmp[2,5] = landingBmp[6,5] = landingBmp[7,5] = landingBmp[8,5] = 1
+landingBmp[5,2] = landingBmp[5,3] = landingBmp[6,3] = landingBmp[7,4] = landingBmp[6,4] = landingBmp[5,4] = 1
+landingTg = displayio.TileGrid(landingBmp, pixel_shader=landingPalette)
+landingG = displayio.Group(x=matrixportal.display.width + 12, y=10)
+landingG.append(landingTg)
+
+# Scroll the plane bitmap left to right (same direction as scrolling text)
+def plane_animation():
+    matrixportal.display.show(planeG)
+    # Start from the left of the screen (off-screen) and move to the right
+    for i in range(-12, matrixportal.display.width + 24):
+        planeG.x = i
+        w.feed()
+        time.sleep(PLANE_SPEED)
+
+# Function to animate the plane taking off
+def plane_animation_take_off():
+    matrixportal.display.show(planeG)
+    planeG.x = -12
+    planeG.y = matrixportal.display.height - 1
+    steps = matrixportal.display.width + 24
+    for i in range(steps):
+        planeG.x = -12 + i
+        planeG.y = matrixportal.display.height - 1 - (i * matrixportal.display.height // matrixportal.display.width)
+        w.feed()
+        time.sleep(PLANE_SPEED)
+        if planeG.x > matrixportal.display.width or planeG.y < -12:
+            break
+
+# Function to animate the plane landing
+def plane_animation_landing():
+    matrixportal.display.show(landingG)
+    # Start from the top left corner (off-screen)
+    landingG.x = -12
+    landingG.y = -12
+
+    steps = matrixportal.display.width + 24
+    for i in range(steps):
+        # Move diagonally towards the bottom right
+        landingG.x = -12 + i
+        landingG.y = -12 + (i * matrixportal.display.height // matrixportal.display.width)
+
+        w.feed()
+        time.sleep(PLANE_SPEED)
+
+        # Stop the animation if the plane reaches the bottom right corner
+        if landingG.x > matrixportal.display.width or landingG.y > matrixportal.display.height - 1:
+            break
 
 # We can fit three rows of text on a panel, so one label for each. We'll change their text as needed
 label1 = adafruit_display_text.label.Label(
@@ -153,14 +211,6 @@ g.append(label2)
 g.append(label3)
 matrixportal.display.show(g)
 
-# Scroll the plane bitmap right to left (same direction as scrolling text)
-def plane_animation():
-    matrixportal.display.show(planeG)
-    for i in range(matrixportal.display.width+24,-12,-1):
-            planeG.x=i
-            w.feed()
-            time.sleep(PLANE_SPEED)
-            #matrixportal.display.refresh(minimum_frames_per_second=0)
 
 # Scroll a label, start at the right edge of the screen and go left one pixel at a time
 # Until the right edge of the label reaches the left edge of the screen
@@ -206,7 +256,6 @@ def display_flight():
 # Blank the display when a flight is no longer found
 def clear_flight():
     label1.text=label2.text=label3.text=""
-
 
 # Take the flight ID we found with a search, and load details about it
 def get_flight_details(requests_session, fn):
@@ -348,13 +397,6 @@ def parse_details_json():
         if not label3_long:
             label3_long=''
 
-
-        # optional filter example - check things and return false if you want
-
-        # if altitude > 10000:
-        #    print("Altitude Filter matched so don't display anything")
-        #    return False
-
     except (KeyError, ValueError,TypeError) as e:
         print("JSON error")
         print (e)
@@ -387,12 +429,6 @@ def checkConnection():
         print(f"Failed to connect to WiFi: {e}")
         return False
 
-# Look for flights overhead
-#def setup_wifi_and_requests():
-#    pool = socketpool.SocketPool(wifi.radio)
-#    requests = adafruit_requests.Session(pool, ssl.create_default_context())
-#    return requests
-
 def get_flights(requests_session, FLIGHT_SEARCH_URL, rheaders):
     print("Starting get_flights function")
     print(f"Flight Search URL: {FLIGHT_SEARCH_URL}")
@@ -404,11 +440,13 @@ def get_flights(requests_session, FLIGHT_SEARCH_URL, rheaders):
         for flight_id, flight_info in response.items():
             if not (flight_id == "version" or flight_id == "full_count"):
                 if len(flight_info) > 13:
-                    return flight_id
+                    # Return flight ID along with origin and destination
+                    origin = flight_info[11]
+                    destination = flight_info[12]
+                    return flight_id, origin, destination
     except Exception as e:
         print(f"Exception caught: {e}")
-        return False
-
+        return False, None, None
 
 # Initialize WiFi and Requests
 requests_session = setup_wifi_and_requests()
@@ -424,21 +462,17 @@ rheaders = {
 # Call get_flights with the initialized requests session
 get_flights(requests_session, FLIGHT_SEARCH_URL, rheaders)
 
-
-
 # Actual doing of things - loop forever quering fr24, processing any results and waiting to query again
-
 checkConnection()
 
 last_flight=''
-# Main loop
 while True:
     w.feed()
 
     print("memory free: " + str(gc.mem_free()))
 
     print("Get flights...")
-    flight_id = get_flights(requests_session, FLIGHT_SEARCH_URL, rheaders)
+    flight_id, origin, destination = get_flights(requests_session, FLIGHT_SEARCH_URL, rheaders)
     w.feed()
 
     if flight_id:
@@ -452,7 +486,17 @@ while True:
                 gc.collect()
                 if parse_details_json():
                     gc.collect()
-                    plane_animation()
+                    # Check if the flight is taking off or landing at HOME_AIRPORT
+                    if origin == HOME_AIRPORT:
+                        # Flight is taking off from HOME_AIRPORT
+                        plane_animation_take_off()
+                    elif destination == HOME_AIRPORT:
+                        # Flight is landing at HOME_AIRPORT
+                        plane_animation_landing()
+                    else:
+                        # Neither taking off nor landing at HOME_AIRPORT
+                        plane_animation()
+
                     display_flight()
                 else:
                     print("error parsing JSON, skip displaying this flight")
@@ -467,6 +511,6 @@ while True:
     time.sleep(5)
 
     for i in range(0, QUERY_DELAY, +5):
-        time.sleep(5)
+        time.sleep(1)
         w.feed()
     gc.collect()
