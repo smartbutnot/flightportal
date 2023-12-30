@@ -430,6 +430,31 @@ def checkConnection():
         return False
 
 # Define get_flights to return a list of all flights
+#def get_flights(requests_session, FLIGHT_SEARCH_URL, rheaders):
+#    print("Starting get_flights function")
+#    print(f"Flight Search URL: {FLIGHT_SEARCH_URL}")
+#
+#    try:
+#        response = requests_session.get(FLIGHT_SEARCH_URL, headers=rheaders, timeout=10)
+#        if response.status_code == 200:
+#            data = response.json()
+#            flights = []
+#            for flight_id, flight_info in data.items():
+#                if flight_id not in ["version", "full_count"]:
+#                    if len(flight_info) > 13:
+#                        origin = flight_info[11]
+#                        destination = flight_info[12]
+#                        flights.append((flight_id, origin, destination))
+#            return flights
+#        else:
+#            print("Error in API response. Status Code:", response.status_code)
+#            return []
+#    except requests.exceptions.Timeout:
+#        print("Request timed out")
+#        return []
+#    except Exception as e:
+#        print(f"Exception caught: {e}")
+#        return []
 def get_flights(requests_session, FLIGHT_SEARCH_URL, rheaders):
     print("Starting get_flights function")
     print(f"Flight Search URL: {FLIGHT_SEARCH_URL}")
@@ -449,9 +474,6 @@ def get_flights(requests_session, FLIGHT_SEARCH_URL, rheaders):
         else:
             print("Error in API response. Status Code:", response.status_code)
             return []
-    except requests.exceptions.Timeout:
-        print("Request timed out")
-        return []
     except Exception as e:
         print(f"Exception caught: {e}")
         return []
