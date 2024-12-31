@@ -28,8 +28,6 @@ FONT=terminalio.FONT
 
 # How often to query fr24 - quick enough to catch a plane flying over, not so often as to cause any issues, hopefully
 QUERY_DELAY=30
-#Area to search for flights, see secrets file
-BOUNDS_BOX=os.getenv("bounds_box")
 
 # Colours and timings
 ROW_ONE_COLOUR=0xEE82EE
@@ -44,8 +42,12 @@ PLANE_SPEED=0.04
 TEXT_SPEED=0.04
 
 ssid = os.getenv("CIRCUITPY_WIFI_SSID")
-
 password = os.getenv("CIRCUITPY_WIFI_PASSWORD")
+#Area to search for flights, see secrets file
+BOUNDS_BOX=os.getenv("bounds_box")
+#enable status led?
+status_led_value = os.getenv("status_leds", "True").lower()
+USE_LEDS = status_led_value in ["true", "1", "yes", "on"]
 
 #URLs
 FLIGHT_SEARCH_HEAD="https://data-cloud.flightradar24.com/zones/fcgi/feed.js?bounds="
@@ -360,6 +362,7 @@ def checkConnection():
             print("could not connect to AP, retrying: ", e)
             continue
     print("Connected")# str(radio.ssid, "utf-8"), "\tRSSI:", radio.rssi)
+    set_led_color(status_light, 'green')
     
 
 
@@ -378,11 +381,39 @@ def get_flights():
                         return flight_id
         else:
             return False
+def set_led_color(status_light, color_name):
+    """
+    Set the status LED to a predefined color
+    
+    Args:
+        status_light: The initialized NeoPixel object
+        color_name (str): Name of the color to set
+    """
+    if not USE_LEDS or status_light is None:
+        return False
+    # Dictionary of predefined colors as RGB tuples
+    colors = {
+        'red': (255, 0, 0),
+        'green': (0, 255, 0),
+        'blue': (0, 0, 255),
+        'yellow': (255, 255, 0),
+        'purple': (255, 0, 255),
+        'white': (255, 255, 255),
+        'off': (0, 0, 0)
+    }
+    
+    # Check if the color exists in our dictionary
+    if color_name.lower() in colors:
+        status_light[0] = colors[color_name.lower()]
+        status_light.show()
+        return True
+    else:
+        return False
 
 
 
 # Actual doing of things - loop forever quering fr24, processing any results and waiting to query again
-
+set_led_color(status_light, 'yellow')
 checkConnection()
 
 pool = adafruit_connection_manager.get_radio_socketpool(radio)
@@ -393,6 +424,7 @@ requests = adafruit_requests.Session(pool, ssl_context)
 last_flight=''
 while True:
     if not radio.is_connected:
+        set_led_color(status_light, 'yellow')
         checkConnection()
 
     w.feed()
