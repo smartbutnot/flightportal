@@ -1,0 +1,115 @@
+FlightPortal Compact Handoff
+Date: 2026-04-10
+Repo: flightportal
+
+What was done
+- Reviewed the original 3-year-old CircuitPython MatrixPortal project.
+- Refactored the original monolithic code into modules:
+  - code.py: app entry point and loop
+  - config.py: settings, colors, timings, feature flags
+  - network.py: WiFi and HTTP handling
+  - parser.py: defensive FR24 JSON parsing
+  - display.py: matrix rendering and animations
+  - flight_tracker.py: flight detection, deduplication, history plumbing
+  - utils.py: logging, memory helpers, buffer handling
+  - test_fixtures.py: sample FR24 payloads
+- Added offline/local test support for standard Python.
+- Added terminal display simulator.
+- Updated README with test/demo commands and software summary.
+
+Testing status
+- Standard Python test suite works locally without hardware.
+- Current command to validate:
+  python run_tests.py
+- Last known result: all 5/5 test suites passed.
+- Display simulator works locally:
+  python simulate_display.py
+  python simulate_display.py --demo
+
+Phase 2 user-selected features completed
+1. Error state display
+- WiFi errors show red text state.
+- API errors show orange warning state.
+- Normal label colors restore after recovery.
+
+2. Altitude and speed overlay
+- Row 3 can show altitude and speed from FR24 trail data.
+- Controlled by config.py:
+  ROW3_MODE = 'alt_speed'
+- Can be switched back to aircraft mode with:
+  ROW3_MODE = 'aircraft'
+
+3. Brightness auto-adjust
+- Added brightness schedule support in config.py.
+- Uses time-based schedule when RTC/time is available.
+- Can be disabled with:
+  BRIGHTNESS_ENABLED = False
+
+4. Airline tail/logo color styling
+- Plane animation color changes based on airline prefix/callsign.
+- Airline colors stored in config.py AIRLINE_COLORS.
+- Unknown airlines fall back to default indigo.
+
+Display simulator notes
+- There was a mirroring/upside-down text issue in simulate_display.py.
+- Fixed by changing font bit reading from MSB-first to LSB-first.
+- Simulator commands:
+  python simulate_display.py --screen normal
+  python simulate_display.py --screen alt_speed
+  python simulate_display.py --screen tail_logo
+  python simulate_display.py --screen wifi_error
+  python simulate_display.py --screen api_error
+  python simulate_display.py --screen night_mode
+  python simulate_display.py --screen no_flights
+
+README updates added
+- Software modernization summary
+- Phase 1 modular architecture summary
+- Phase 2 features summary
+- Full test commands
+- Full simulator/demo commands
+- Config quick reference
+
+Current overall status
+- Phase 1: complete
+- Phase 2 selected items: complete
+- Wider Phase 2 roadmap still open for optional future work:
+  - Flight history and stats screen(s)
+  - Multiple search zones
+  - Idle/debug status screen
+  - Offline cache / fallback display
+  - Web dashboard/config UI
+
+Recommended next options
+1. Flight history and stats
+- Show last 10 flights seen.
+- Add rotation/cycle view on idle or button-triggered display.
+
+2. Multiple search zones
+- Rotate between several bounds boxes.
+- Useful if current search area is too narrow.
+
+3. Idle/debug status screen
+- Show WiFi status, last update, memory, or no-flights state when idle.
+
+4. Offline cache/fallback
+- Keep last good flight visible if FR24 or WiFi briefly fails.
+
+Important caveat
+- Wokwi does not support CircuitPython MatrixPortal simulation.
+- Practical testing path is:
+  - standard Python tests on PC
+  - terminal display simulator on PC
+  - final validation on real MatrixPortal hardware
+
+Useful files to inspect next
+- README.md
+- code.py
+- config.py
+- display.py
+- parser.py
+- simulate_display.py
+- run_tests.py
+
+Suggested prompt for a new chat
+"Continue from COMPACT_HANDOFF.txt in the flightportal repo. Phase 1 is complete, and the implemented Phase 2 items are error states, altitude/speed overlay, brightness auto-adjust, and airline plane colors. Next I want to work on: <choose one>."
