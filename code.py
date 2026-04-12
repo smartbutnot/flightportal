@@ -1,26 +1,23 @@
+import os
 import time
-from random import randrange
-import board
 import terminalio
 from adafruit_matrixportal.matrixportal import MatrixPortal
-from adafruit_portalbase.network import HttpError
-import adafruit_requests as requests
+import adafruit_connection_manager
+import board # type: ignore
 import json
 
 import adafruit_display_text.label
 import board
 import displayio
-import framebufferio
-import rgbmatrix
 import terminalio
 import gc
+
 
 import busio
 from digitalio import DigitalInOut
 import neopixel
 from adafruit_esp32spi import adafruit_esp32spi
-from adafruit_esp32spi import adafruit_esp32spi_wifimanager
-
+import adafruit_requests
 from microcontroller import watchdog as w
 from watchdog import WatchDogMode
 
@@ -29,16 +26,8 @@ w.mode = WatchDogMode.RESET
 
 FONT=terminalio.FONT
 
-try:
-    from secrets import secrets
-except ImportError:
-    print("Secrets including geo are kept in secrets.py, please add them there!")
-    raise
-
 # How often to query fr24 - quick enough to catch a plane flying over, not so often as to cause any issues, hopefully
 QUERY_DELAY=30
-#Area to search for flights, see secrets file
-BOUNDS_BOX=secrets["bounds_box"]
 
 # Colours and timings
 ROW_ONE_COLOUR=0xEE82EE
@@ -51,6 +40,14 @@ PAUSE_BETWEEN_LABEL_SCROLLING=3
 PLANE_SPEED=0.04
 # speed text labels will move - pause time per pixel shift in seconds
 TEXT_SPEED=0.04
+
+ssid = os.getenv("CIRCUITPY_WIFI_SSID")
+password = os.getenv("CIRCUITPY_WIFI_PASSWORD")
+#Area to search for flights, see secrets file
+BOUNDS_BOX=os.getenv("bounds_box")
+#enable status led?
+status_led_value = os.getenv("status_leds", "True").lower()
+USE_LEDS = status_led_value in ["true", "1", "yes", "on"]
 
 #URLs
 FLIGHT_SEARCH_HEAD="https://data-cloud.flightradar24.com/zones/fcgi/feed.js?bounds="
@@ -73,16 +70,14 @@ esp32_cs = DigitalInOut(board.ESP_CS)
 esp32_ready = DigitalInOut(board.ESP_BUSY)
 esp32_reset = DigitalInOut(board.ESP_RESET)
 spi = busio.SPI(board.SCK, board.MOSI, board.MISO)
-esp = adafruit_esp32spi.ESP_SPIcontrol(spi, esp32_cs, esp32_ready, esp32_reset)
+radio = adafruit_esp32spi.ESP_SPIcontrol(spi, esp32_cs, esp32_ready, esp32_reset)
 status_light = neopixel.NeoPixel(
     board.NEOPIXEL, 1, brightness=0.2
 )
-wifi = adafruit_esp32spi_wifimanager.ESPSPI_WiFiManager(esp, secrets, status_light,debug=False,attempts=1)
-
 # Top level matrixportal object
 matrixportal = MatrixPortal(
     headers=rheaders,
-    esp=esp,
+    esp=radio,
     rotation=0,
     debug=False
 )
@@ -141,11 +136,11 @@ g = displayio.Group()
 g.append(label1)
 g.append(label2)
 g.append(label3)
-matrixportal.display.show(g)
+matrixportal.display.root_group = g
 
 # Scroll the plane bitmap right to left (same direction as scrolling text)
 def plane_animation():
-    matrixportal.display.show(planeG)
+    matrixportal.display.root_group = planeG
     for i in range(matrixportal.display.width+24,-12,-1):
             planeG.x=i
             w.feed()
@@ -166,7 +161,7 @@ def scroll(line):
 # Populate the labels, then scroll longer versions of the text
 def display_flight():
 
-    matrixportal.display.show(g)
+    matrixportal.display.root_group = g
     label1.text=label1_short
     label2.text=label2_short
     label3.text=label3_short
@@ -249,7 +244,7 @@ def get_flight_details(fn):
                     print("Details lookup saved "+str(trail_end)+" bytes.")
                     return True
     # Handle occasional URL fetching errors            
-    except (RuntimeError, OSError, HttpError) as e:
+    except (RuntimeError, OSError) as e:
             print("Error--------------------------------------------------")
             print(e)
             return False
@@ -358,59 +353,79 @@ def parse_details_json():
 
 
 def checkConnection():
-    print("Check and reconnect WiFi")
-    attempts=10
-    attempt=1
-    while (not esp.status == adafruit_esp32spi.WL_CONNECTED) and attempt<attempts:
-        print("Connect attempt "+str(attempt)+" of "+str(attempts))
-        print("Reset ESP...")
-        w.feed()
-        wifi.reset()
-        print("Attempt WiFi connect...")
-        w.feed()
+    print("Connecting to AP...")
+    while not radio.is_connected:
         try:
-            wifi.connect()
-        except OSError as e:
-            print(e.__class__.__name__+"--------------------------------------")
-            print(e)
-        attempt+=1
-    if esp.status == adafruit_esp32spi.WL_CONNECTED:
-        print("Successfully connected.")
-    else:
-        print("Failed to connect.")
+            w.feed()
+            radio.connect_AP(ssid, password)
+        except (RuntimeError,ConnectionError) as e:
+            print("could not connect to AP, retrying: ", e)
+            continue
+    print("Connected")# str(radio.ssid, "utf-8"), "\tRSSI:", radio.rssi)
+    set_led_color(status_light, 'green')
+    
+
 
 
 # Look for flights overhead
 def get_flights():
     matrixportal.url=FLIGHT_SEARCH_URL
-    try:
-        #response = json.loads(matrixportal.fetch())
-        response=requests.get(url=FLIGHT_SEARCH_URL,headers=rheaders).json()
-    except (RuntimeError,OSError, HttpError, ValueError, requests.OutOfRetries) as e:
-        print(e.__class__.__name__+"--------------------------------------")
-        print(e)
-        checkConnection()
-        return False
-    if len(response)==3:
-        #print ("Flight found.")
-        for flight_id, flight_info in response.items():
-            # the JSON has three main fields, we want the one that's a flight ID
-            if not (flight_id=="version" or flight_id=="full_count"):
-                if len(flight_info)>13:
-                    return flight_id
+    with requests.get(url=FLIGHT_SEARCH_URL,headers=rheaders) as response:
+        data = response.json()  # Parse the JSON response
+        if len(data)==3:
+            #print ("Flight found.")
+            for flight_id, flight_info in data.items():
+                # the JSON has three main fields, we want the one that's a flight ID
+                if not (flight_id=="version" or flight_id=="full_count"):
+                    if len(flight_info)>13:
+                        return flight_id
+        else:
+            return False
+def set_led_color(status_light, color_name):
+    """
+    Set the status LED to a predefined color
+    
+    Args:
+        status_light: The initialized NeoPixel object
+        color_name (str): Name of the color to set
+    """
+    if not USE_LEDS or status_light is None:
+        color_name = "off"
+    # Dictionary of predefined colors as RGB tuples
+    colors = {
+        'red': (255, 0, 0),
+        'green': (0, 255, 0),
+        'blue': (0, 0, 255),
+        'yellow': (255, 255, 0),
+        'purple': (255, 0, 255),
+        'white': (255, 255, 255),
+        'off': (0, 0, 0)
+    }
+    
+    # Check if the color exists in our dictionary
+    if color_name.lower() in colors:
+        status_light[0] = colors[color_name.lower()]
+        status_light.show()
+        return True
     else:
         return False
 
 
 
 # Actual doing of things - loop forever quering fr24, processing any results and waiting to query again
-
+set_led_color(status_light, 'yellow')
 checkConnection()
+
+pool = adafruit_connection_manager.get_radio_socketpool(radio)
+ssl_context = adafruit_connection_manager.get_radio_ssl_context(radio)
+requests = adafruit_requests.Session(pool, ssl_context)
+
 
 last_flight=''
 while True:
-
-    #checkConnection()
+    if not radio.is_connected:
+        set_led_color(status_light, 'yellow')
+        checkConnection()
 
     w.feed()
 
@@ -437,15 +452,14 @@ while True:
                 else:
                     print("error parsing JSON, skip displaying this flight")
             else:
+                w.feed()
                 print("error loading details, skip displaying this flight")
             
             last_flight=flight_id
     else:
         #print("No flights found, clear display")
         clear_flight()
-    
     time.sleep(5)
-
 
     for i in range(0,QUERY_DELAY,+5):
         time.sleep(5)
