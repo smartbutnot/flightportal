@@ -63,7 +63,7 @@ FLIGHT_LONG_DETAILS_HEAD="https://data-live.flightradar24.com/clickhandler/?flig
 rheaders = {
      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:106.0) Gecko/20100101 Firefox/106.0",
      "cache-control": "no-store, no-cache, must-revalidate, post-check=0, pre-check=0",
-     "accept": "application/json"
+     "Accept": "application/json"
 }
 
 esp32_cs = DigitalInOut(board.ESP_CS)
