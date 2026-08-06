@@ -1,23 +1,19 @@
+import gc
+import json
 import os
 import time
-import terminalio
-from adafruit_matrixportal.matrixportal import MatrixPortal
+
 import adafruit_connection_manager
-import board # type: ignore
-import json
-
 import adafruit_display_text.label
-import board
-import displayio
-import terminalio
-import gc
-
-
-import busio
-from digitalio import DigitalInOut
-import neopixel
-from adafruit_esp32spi import adafruit_esp32spi
 import adafruit_requests
+import board  # type: ignore
+import busio
+import displayio
+import neopixel
+import terminalio
+from adafruit_esp32spi import adafruit_esp32spi
+from adafruit_matrixportal.matrixportal import MatrixPortal
+from digitalio import DigitalInOut
 from microcontroller import watchdog as w
 from watchdog import WatchDogMode
 
@@ -45,6 +41,10 @@ ssid = os.getenv("CIRCUITPY_WIFI_SSID")
 password = os.getenv("CIRCUITPY_WIFI_PASSWORD")
 #Area to search for flights, see secrets file
 BOUNDS_BOX=os.getenv("bounds_box")
+
+if not ssid or not password or not BOUNDS_BOX:
+    raise ValueError("Missing required environment variables in settings.toml: CIRCUITPY_WIFI_SSID, CIRCUITPY_WIFI_PASSWORD, bounds_box")
+
 #enable status led?
 status_led_value = os.getenv("status_leds", "True").lower()
 USE_LEDS = status_led_value in ["true", "1", "yes", "on"]
@@ -85,6 +85,11 @@ matrixportal = MatrixPortal(
 # Some memory shenanigans - the matrixportal doesn't do great at assigning big strings dynamically. So we create a big static array to put the JSON results in each time.
 json_size=14336
 json_bytes=bytearray(json_size)
+
+
+def print_memory(stage):
+    print("Memory free", stage, gc.mem_free())
+
 
 # Little plane to scroll across when we find a flight overhead
 planeBmp = displayio.Bitmap(12, 12, 2)
@@ -156,7 +161,7 @@ def scroll(line):
         w.feed()
         time.sleep(TEXT_SPEED)
         #matrixportal.display.refresh(minimum_frames_per_second=0)
-        
+
 
 # Populate the labels, then scroll longer versions of the text
 def display_flight():
@@ -166,21 +171,21 @@ def display_flight():
     label2.text=label2_short
     label3.text=label3_short
     time.sleep(PAUSE_BETWEEN_LABEL_SCROLLING)
-    
+
     label1.x=matrixportal.display.width+1
     label1.text=label1_long
     scroll(label1)
     label1.text=label1_short
     label1.x=1
     time.sleep(PAUSE_BETWEEN_LABEL_SCROLLING)
-    
+
     label2.x=matrixportal.display.width+1
     label2.text=label2_long
     scroll(label2)
     label2.text=label2_short
     label2.x=1
     time.sleep(PAUSE_BETWEEN_LABEL_SCROLLING)
-    
+
     label3.x=matrixportal.display.width+1
     label3.text=label3_long
     scroll(label3)
@@ -202,7 +207,9 @@ def get_flight_details(fn):
     global json_size
     byte_counter=0
     chunk_length=1024
-    success=False
+
+    print("Details lookup for", fn)
+    print_memory("before details lookup")
 
     # zero out any old data in the byte array
     for i in range(0,json_size):
@@ -211,8 +218,9 @@ def get_flight_details(fn):
     # Get the URL response one chunk at a time
     try:
         response=requests.get(url=FLIGHT_LONG_DETAILS_HEAD+fn,headers=rheaders)
+        print("Details HTTP status", response.status_code)
+        print_memory("after details response")
         for chunk in response.iter_content(chunk_size=chunk_length):
-
             # if the chunk will fit in the byte array, add it
             if(byte_counter+chunk_length<=json_size):
                 for i in range(0,len(chunk)):
@@ -227,10 +235,11 @@ def get_flight_details(fn):
 
             # if it does, find the first/most recent of the many trail entries, giving us things like speed and heading
             if not trail_start==-1:
+                print("Found trail at", trail_start, "after", byte_counter,
+                      "bytes; free", gc.mem_free())
                 # work out the location of the first } character after the "trail:" tag, giving us the first entry
-                trail_end=json_bytes[trail_start:].find((b"}"))
+                trail_end=json_bytes.find(b"}", trail_start)
                 if not trail_end==-1:
-                    trail_end+=trail_start
                     # characters to add to make the whole JSON object valid, since we're cutting off the end
                     closing_bytes=b'}]}'
                     for i in range (0,len(closing_bytes)):
@@ -242,8 +251,9 @@ def get_flight_details(fn):
 
                     # Stop reading chunks
                     print("Details lookup saved "+str(trail_end)+" bytes.")
+                    print_memory("after details lookup")
                     return True
-    # Handle occasional URL fetching errors            
+    # Handle occasional URL fetching errors
     except (RuntimeError, OSError) as e:
             print("Error--------------------------------------------------")
             print(e)
@@ -252,36 +262,49 @@ def get_flight_details(fn):
     #If we got here we got through all the JSON without finding the right trail entries
     print("Failed to find a valid trail entry in JSON")
     return False
-    
+
 
 # Look at the byte array that fetch_details saved into and extract any fields we want
 def parse_details_json():
 
     global json_bytes
+    parse_stage="json.loads"
 
     try:
         # get the JSON from the bytes
+        print("Parse stage", parse_stage)
+        print_memory("before json.loads")
         long_json=json.loads(json_bytes)
+        print_memory("after json.loads")
 
         # Some available values from the JSON. Put the details URL and a flight ID in your browser and have a look for more.
 
+        parse_stage="identification.number.default"
         flight_number=long_json["identification"]["number"]["default"]
         #print(flight_number)
+        parse_stage="identification.callsign"
         flight_callsign=long_json["identification"]["callsign"]
+        parse_stage="aircraft.model.code"
         aircraft_code=long_json["aircraft"]["model"]["code"]
+        parse_stage="aircraft.model.text"
         aircraft_model=long_json["aircraft"]["model"]["text"]
         #aircraft_registration=long_json["aircraft"]["registration"]
+        parse_stage="airline.name"
         airline_name=long_json["airline"]["name"]
         #airline_short=long_json["airline"]["short"]
+        parse_stage="airport.origin.name"
         airport_origin_name=long_json["airport"]["origin"]["name"]
         airport_origin_name=airport_origin_name.replace(" Airport","")
+        parse_stage="airport.origin.code.iata"
         airport_origin_code=long_json["airport"]["origin"]["code"]["iata"]
         #airport_origin_country=long_json["airport"]["origin"]["position"]["country"]["name"]
         #airport_origin_country_code=long_json["airport"]["origin"]["position"]["country"]["code"]
         #airport_origin_city=long_json["airport"]["origin"]["position"]["region"]["city"]
         #airport_origin_terminal=long_json["airport"]["origin"]["info"]["terminal"]
+        parse_stage="airport.destination.name"
         airport_destination_name=long_json["airport"]["destination"]["name"]
         airport_destination_name=airport_destination_name.replace(" Airport","")
+        parse_stage="airport.destination.code.iata"
         airport_destination_code=long_json["airport"]["destination"]["code"]["iata"]
         #airport_destination_country=long_json["airport"]["destination"]["position"]["country"]["name"]
         #airport_destination_country_code=long_json["airport"]["destination"]["position"]["country"]["code"]
@@ -344,8 +367,9 @@ def parse_details_json():
         #    return False
 
     except (KeyError, ValueError,TypeError) as e:
-        print("JSON error")
+        print("JSON error at", parse_stage)
         print (e)
+        print_memory("after JSON error")
         return False
 
 
@@ -363,7 +387,7 @@ def checkConnection():
             continue
     print("Connected")# str(radio.ssid, "utf-8"), "\tRSSI:", radio.rssi)
     set_led_color(status_light, 'green')
-    
+
 
 
 
@@ -384,7 +408,7 @@ def get_flights():
 def set_led_color(status_light, color_name):
     """
     Set the status LED to a predefined color
-    
+
     Args:
         status_light: The initialized NeoPixel object
         color_name (str): Name of the color to set
@@ -401,7 +425,7 @@ def set_led_color(status_light, color_name):
         'white': (255, 255, 255),
         'off': (0, 0, 0)
     }
-    
+
     # Check if the color exists in our dictionary
     if color_name.lower() in colors:
         status_light[0] = colors[color_name.lower()]
@@ -429,12 +453,13 @@ while True:
 
     w.feed()
 
-    #print("memory free: " + str(gc.mem_free()))
+    print_memory("at loop start")
 
     #print("Get flights...")
     flight_id=get_flights()
     w.feed()
-    
+    print_memory("after flight search")
+
 
     if flight_id:
         if flight_id==last_flight:
@@ -445,8 +470,10 @@ while True:
             if get_flight_details(flight_id):
                 w.feed()
                 gc.collect()
+                print_memory("after details gc")
                 if parse_details_json():
                     gc.collect()
+                    print_memory("after parse gc")
                     plane_animation()
                     display_flight()
                 else:
@@ -454,7 +481,7 @@ while True:
             else:
                 w.feed()
                 print("error loading details, skip displaying this flight")
-            
+
             last_flight=flight_id
     else:
         #print("No flights found, clear display")
@@ -465,3 +492,4 @@ while True:
         time.sleep(5)
         w.feed()
     gc.collect()
+    print_memory("at loop end after gc")
